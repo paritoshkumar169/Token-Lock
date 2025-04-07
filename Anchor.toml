@@ -4,14 +4,14 @@
 seeds = false
 skip-lint = false
 
-[programs.localnet]
+[programs.devnet]
 token_lock = "DNeSEvYcNVwGYruy756J5C2rDMGuTQ2yFhnTkjRHrwYi"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "http://127.0.0.1:8899"
+cluster = "https://api.devnet.solana.com"
 wallet = "/Users/paritoshkumar/.config/solana/id.json"
 
 [scripts]
