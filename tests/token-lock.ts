@@ -1,55 +1,41 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { TokenLock } from "../target/types/token_lock";
-import { PublicKey, SystemProgram, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { assert } from "chai";
 
 describe("token-lock", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
+
   const program = anchor.workspace.TokenLock as Program<TokenLock>;
-
   const authority = provider.wallet;
-  let vaultPda: PublicKey;
+  const recipient = anchor.web3.Keypair.generate();
 
-  it("Initializes vault", async () => {
-    [vaultPda] = PublicKey.findProgramAddressSync(
+  let vaultPda: anchor.web3.PublicKey;
+  let bump: number;
+
+  it("Initializes the vault", async () => {
+    [vaultPda, bump] = await anchor.web3.PublicKey.findProgramAddress(
       [Buffer.from("vault"), authority.publicKey.toBuffer()],
       program.programId
     );
 
-    const tx = await program.methods.initialize().accounts({
-      vault: vaultPda,
-      authority: authority.publicKey,
-      systemProgram: SystemProgram.programId,
-    }).rpc();
+    await program.methods
+      .initialize(
+        recipient.publicKey,
+        2, // cancel_permission = creator
+        0, // change_recipient_permission = none
+        new anchor.BN(5) // lock duration = 5 seconds
+      )
+      .accounts({
+        vault: vaultPda,
+        authority: authority.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .rpc();
 
-    console.log("✅ Vault initialized at:", vaultPda.toBase58());
-    console.log("🔗 Tx:", tx);
-  });
-
-  it("Deposits 0.5 SOL into vault", async () => {
-    const depositAmount = 0.5 * LAMPORTS_PER_SOL;
-
-    const tx = await program.methods.deposit(new anchor.BN(depositAmount)).accounts({
-      vault: vaultPda,
-      user: authority.publicKey,
-      systemProgram: SystemProgram.programId,
-    }).rpc();
-
-    console.log("✅ Deposited 0.5 SOL into vault");
-    console.log("🔗 Tx:", tx);
-  });
-
-  it("Withdraws 0.2 SOL from vault", async () => {
-    const withdrawAmount = 0.2 * LAMPORTS_PER_SOL;
-
-    const tx = await program.methods.withdraw(new anchor.BN(withdrawAmount)).accounts({
-      vault: vaultPda,
-      authority: authority.publicKey,
-      recipient: authority.publicKey,
-    }).rpc();
-
-    console.log("✅ Withdrew 0.2 SOL from vault to authority");
-    console.log("🔗 Tx:", tx);
+    const vault = await program.account.vault.fetch(vaultPda);
+    assert.strictEqual(vault.authority.toBase58(), authority.publicKey.toBase58());
+    assert.strictEqual(vault.recipient.toBase58(), recipient.publicKey.toBase58());
   });
 });
